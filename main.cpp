@@ -1,103 +1,153 @@
 #include <iostream>
 #include <pthread.h>
-#include <time.h>
-
-
-#define MAX 20
-#define THREAD_MAX 4
+#include <string>
+#include <cmath>
 
 using namespace std;
 
-int ARR[MAX];
-int part = 0;
 
-void merge(int low, int mid, int high) {
-    int* left = new int[mid - low + 1];
-    int* right = new int[high - mid];
+int g_size_arr;
+int g_num_threads;
+pthread_mutex_t g_mutex;
 
-    int size_left = mid - low + 1;
-    int size_right = high - mid;
-    int i, j;
+struct params {
+    string* array;
+    int left;
+    int right;
+    string* mod;
+};
 
-    for (i = 0; i < size_left; i++)
-        left[i] = ARR[i + low];
+int char_to_int(char c) {
+    if (c >= '0' && c <= '9') {
+        return (c-'0');
+    } else if (c >= 'p' && c <= 'z') {
+        c -= 'W';
+    } else if (c >= 'A' && c <= 'Z') {
+        c = tolower(c);
+        c -= 'W';
+    } else {
+        return 0;
+    }
+}
 
-    for (i = 0; i < size_right; i++)
-        right[i] = ARR[i + mid + 1];
+bool a_lower_or_eq_b(string a, string b) {
+    int vec_a = 0;
+    int vec_b = 0;
+    int k = 1;
+    int i;
+    for(i = a.size(); i > 0; --i) {
+        vec_a += char_to_int(a[i]) * k;
+        k *= 10;
+    }
+    k = 1;
+    for(i = b.size(); i > 0; --i) {
+        --i;
+        vec_b += char_to_int(b[i]) * k;
+        k *= 10;
+    }
+    if (vec_a <= vec_b) {
+        return  true;
+    }
+    return false;
+}
 
-    int k = low;
-    i = j = 0;
-
-    while (i < size_left && j < size_right) {
-        if (left[i] <= right[j])
-            ARR[k++] = left[i++];
+void merge(string *array, int left, int middle, int right, string *modif) {
+    int l = left;
+    int r = middle;
+    for (int i = left; i < right; ++i)
+        if (l < middle && (r >= right || a_lower_or_eq_b(array[l], array[r])))
+            modif[i] = array[l++];
         else
-            ARR[k++] = right[j++];
-    }
-
-    while (i < size_left) {
-        ARR[k++] = left[i++];
-    }
-
-    while (j < size_right) {
-        ARR[k++] = right[j++];
-    }
+            modif[i] = array[r++];
+    for (int i = left; i < right; i++)
+        array[i] = modif[i];
 }
 
-void merge_sort(int low, int high) {
+void* split(void* param) {
+    struct params* temp_args = new params;
+    temp_args = (params*)param;
 
-    int mid = low + (high - low) / 2;
+    if (temp_args->right - temp_args->left < 2)
+        return NULL;
 
-    if (low < high) {
-        merge_sort(low, mid);
+    int tmp_right = temp_args->right;
+    int tmp_left = temp_args->left;
 
-        merge_sort(mid + 1, high);
+    temp_args->right = (tmp_left + tmp_right) / 2;
+    split((void*)temp_args);
 
-        merge(low, mid, high);
-    }
+    temp_args->right = tmp_right;
+    temp_args->left = (tmp_left + tmp_right) / 2;
+    split((void*)temp_args);
+
+    temp_args->left = tmp_left;
+    merge(temp_args->array, temp_args->left, (temp_args->left + temp_args->right) / 2, temp_args->right, temp_args->mod);
 }
 
-void* merge_sort(void* arg) {
+void merge_sort(string *array) {
+    struct params* p = new params;
 
-    int thread_part = part++;
+    string temp[g_size_arr];
+    pthread_t threads[g_num_threads];
 
-    int low = thread_part * (MAX / 4);
-    int high = (thread_part + 1) * (MAX / 4) - 1;
-    int mid = low + (high - low) / 2;
+    int new_left;
+    int new_right;
+    for (int i = 0; i < g_num_threads; ++i) {
+        new_left = i * g_size_arr / g_num_threads;
+        new_right = (i + 1) * g_size_arr / g_num_threads;
 
-    if (low < high) {
-        merge_sort(low, mid);
-        merge_sort(mid + 1, high);
-        merge(low, mid, high);
-    }
-}
+        p->mod = temp;
+        p->array = array;
+        p->left = new_left;
+        p->right = new_right;
 
-int main() {
-    for (int i = 0; i < MAX; i++)
-        ARR[i] = rand() % 100;
+        pthread_mutex_init(&g_mutex, NULL);
 
-    clock_t t1, t2;
+        pthread_create(&threads[i], NULL, split, (void*)p);
 
-    t1 = clock();
-    pthread_t threads[THREAD_MAX];
-
-    for (int i = 0; i < THREAD_MAX; i++)
-        pthread_create(&threads[i], NULL, merge_sort, (void*)NULL);
-
-    for (int i = 0; i < 4; i++)
         pthread_join(threads[i], NULL);
 
-    merge(0, (MAX / 2 - 1) / 2, MAX / 2 - 1);
-    merge(MAX / 2, MAX / 2 + (MAX - 1 - MAX / 2) / 2, MAX - 1);
-    merge(0, (MAX - 1) / 2, MAX - 1);
+        pthread_mutex_destroy(&g_mutex);
+    }
+    int j;
+    int left;
+    int right;
+    for (int i = g_num_threads / 2; i > 0; i = i >> 1) //divide by 2
+        for (j = 0; j < i; ++j) {
+            left = j * g_size_arr / i;
+            right = (j + 1) * g_size_arr / i;
 
-    t2 = clock();
+            merge(array, left, (left + right) / 2, right, temp);
+        }
+}
 
-    cout << "Sorted array: ";
-    for (int i = 0; i < MAX; i++)
-        cout << ARR[i] << " ";
+int main(int argc, char *argv[]) {
+    cin >> g_size_arr;
 
-    cout << "\nTime taken: " << (t2 - t1) / (double)CLOCKS_PER_SEC << endl;
+    string array[g_size_arr];
 
+    for (int i = 0; i < g_size_arr; ++i)
+        // cin >> array[i];
+        array[i] = rand() % 100;
+
+    g_num_threads = atoi(argv[1]);
+
+    int power = 0;
+    while (g_num_threads > 0) {
+        g_num_threads = g_num_threads >> 1;  // div 2
+        ++power;
+    }
+
+    --power;
+    if (!power)
+        power = 1;
+
+    g_num_threads = (int)pow(2.0, (double)(power));
+
+    merge_sort(array);
+
+    cout << "\n Sorted array:\t";
+    for (int i = 0; i < g_size_arr; ++i)
+        cout << array[i] << " ";
     return 0;
 }
