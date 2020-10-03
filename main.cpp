@@ -19,15 +19,14 @@ struct params {
 
 int char_to_int(char c) {
     if (c >= '0' && c <= '9') {
-        return (c-'0');
+        c -= '0';
     } else if (c >= 'p' && c <= 'z') {
         c -= 'W';
     } else if (c >= 'A' && c <= 'Z') {
         c = tolower(c);
         c -= 'W';
-    } else {
-        return 0;
     }
+    return c;
 }
 
 bool a_lower_or_eq_b(string a, string b) {
@@ -41,7 +40,6 @@ bool a_lower_or_eq_b(string a, string b) {
     }
     k = 1;
     for(i = b.size(); i > 0; --i) {
-        --i;
         vec_b += char_to_int(b[i]) * k;
         k *= 10;
     }
@@ -59,7 +57,7 @@ void merge(string *array, int left, int middle, int right, string *modif) {
             modif[i] = array[l++];
         else
             modif[i] = array[r++];
-    for (int i = left; i < right; i++)
+    for (int i = left; i < right; ++i)
         array[i] = modif[i];
 }
 
@@ -82,12 +80,13 @@ void* split(void* param) {
 
     temp_args->left = tmp_left;
     merge(temp_args->array, temp_args->left, (temp_args->left + temp_args->right) / 2, temp_args->right, temp_args->mod);
+    return 0;
 }
 
 void merge_sort(string *array) {
     struct params* p = new params;
 
-    string temp[g_size_arr];
+    string tmp[g_size_arr];
     pthread_t threads[g_num_threads];
 
     int new_left;
@@ -96,7 +95,7 @@ void merge_sort(string *array) {
         new_left = i * g_size_arr / g_num_threads;
         new_right = (i + 1) * g_size_arr / g_num_threads;
 
-        p->mod = temp;
+        p->mod = tmp;
         p->array = array;
         p->left = new_left;
         p->right = new_right;
@@ -109,16 +108,18 @@ void merge_sort(string *array) {
 
         pthread_mutex_destroy(&g_mutex);
     }
+
     int j;
     int left;
     int right;
-    for (int i = g_num_threads / 2; i > 0; i = i >> 1) //divide by 2
+    for (int i = g_num_threads / 2; i > 0; i = i >> 1) { //divide by 2
         for (j = 0; j < i; ++j) {
             left = j * g_size_arr / i;
             right = (j + 1) * g_size_arr / i;
 
-            merge(array, left, (left + right) / 2, right, temp);
+            merge(array, left, (left + right) / 2, right, tmp);
         }
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -127,8 +128,8 @@ int main(int argc, char *argv[]) {
     string array[g_size_arr];
 
     for (int i = 0; i < g_size_arr; ++i)
-        // cin >> array[i];
-        array[i] = rand() % 100;
+        cin >> array[i];
+        // array[i] = (int)(rand() % 100);
 
     g_num_threads = atoi(argv[1]);
 
@@ -149,5 +150,6 @@ int main(int argc, char *argv[]) {
     cout << "\n Sorted array:\t";
     for (int i = 0; i < g_size_arr; ++i)
         cout << array[i] << " ";
+    cout << "\n";
     return 0;
 }
