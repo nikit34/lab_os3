@@ -127,9 +127,10 @@ int main(int argc, char *argv[]) {
 
     string array[g_size_arr];
 
-    for (int i = 0; i < g_size_arr; ++i)
-        cin >> array[i];
-        // array[i] = (int)(rand() % 100);
+    for (int i = 0; i < g_size_arr; ++i) {
+        // cin >> array[i];
+        array[i] = to_string(rand() % 100);
+    }
 
     g_num_threads = atoi(argv[1]);
 
