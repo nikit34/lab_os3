@@ -1,103 +1,174 @@
 #include <iostream>
 #include <pthread.h>
-#include <time.h>
-
-
-#define MAX 20
-#define THREAD_MAX 4
+#include <string>
+#include <cmath>
+#include <sys/time.h>
 
 using namespace std;
 
-int ARR[MAX];
-int part = 0;
 
-void merge(int low, int mid, int high) {
-    int* left = new int[mid - low + 1];
-    int* right = new int[high - mid];
+u_long g_size_arr;
+u_long g_num_threads;
+pthread_mutex_t g_mutex;
 
-    int size_left = mid - low + 1;
-    int size_right = high - mid;
-    int i, j;
+struct params {
+    string* array;
+    u_long left;
+    u_long right;
+    string* mod;
+};
 
-    for (i = 0; i < size_left; i++)
-        left[i] = ARR[i + low];
+u_long char_to_int(char c) {
+    if (c >= '0' && c <= '9') {
+        c -= '0';
+    } else if (c >= 'p' && c <= 'z') {
+        c -= 'W';
+    } else if (c >= 'A' && c <= 'Z') {
+        c = tolower(c);
+        c -= 'W';
+    }
+    return c;
+}
 
-    for (i = 0; i < size_right; i++)
-        right[i] = ARR[i + mid + 1];
+bool a_lower_or_eq_b(string a, string b) {
+    u_long vec_a = 0;
+    u_long vec_b = 0;
+    u_long k = 1;
+    u_long i;
+    for(i = a.size(); i > 0; --i) {
+        vec_a += char_to_int(a[i]) * k;
+        k *= 10;
+    }
+    k = 1;
+    for(i = b.size(); i > 0; --i) {
+        vec_b += char_to_int(b[i]) * k;
+        k *= 10;
+    }
+    if (vec_a <= vec_b) {
+        return  true;
+    }
+    return false;
+}
 
-    int k = low;
-    i = j = 0;
-
-    while (i < size_left && j < size_right) {
-        if (left[i] <= right[j])
-            ARR[k++] = left[i++];
+void merge(string *array, u_long left, u_long middle, u_long right, string *modif) {
+    u_long l = left;
+    u_long r = middle;
+    for (u_long i = left; i < right; ++i)
+        if (l < middle && (r >= right || a_lower_or_eq_b(array[l], array[r])))
+            modif[i] = array[l++];
         else
-            ARR[k++] = right[j++];
-    }
-
-    while (i < size_left) {
-        ARR[k++] = left[i++];
-    }
-
-    while (j < size_right) {
-        ARR[k++] = right[j++];
-    }
+            modif[i] = array[r++];
+    for (u_long i = left; i < right; ++i)
+        array[i] = modif[i];
 }
 
-void merge_sort(int low, int high) {
+void* split(void* param) {
+    struct params* temp_args = new params;
+    temp_args = (params*)param;
 
-    int mid = low + (high - low) / 2;
+    if (temp_args->right - temp_args->left < 2)
+        return NULL;
 
-    if (low < high) {
-        merge_sort(low, mid);
+    u_long tmp_right = temp_args->right;
+    u_long tmp_left = temp_args->left;
 
-        merge_sort(mid + 1, high);
+    temp_args->right = (tmp_left + tmp_right) / 2;
+    split((void*)temp_args);
 
-        merge(low, mid, high);
-    }
+    temp_args->right = tmp_right;
+    temp_args->left = (tmp_left + tmp_right) / 2;
+    split((void*)temp_args);
+
+    temp_args->left = tmp_left;
+    merge(temp_args->array, temp_args->left, (temp_args->left + temp_args->right) / 2, temp_args->right, temp_args->mod);
+    return 0;
 }
 
-void* merge_sort(void* arg) {
+void merge_sort(string *array) {
+    struct params* p = new params;
 
-    int thread_part = part++;
+    string tmp[g_size_arr];
+    pthread_t threads[g_num_threads];
 
-    int low = thread_part * (MAX / 4);
-    int high = (thread_part + 1) * (MAX / 4) - 1;
-    int mid = low + (high - low) / 2;
+    u_long new_left;
+    u_long new_right;
+    for (u_long i = 0; i < g_num_threads; ++i) {
+        new_left = i * g_size_arr / g_num_threads;
+        new_right = (i + 1) * g_size_arr / g_num_threads;
 
-    if (low < high) {
-        merge_sort(low, mid);
-        merge_sort(mid + 1, high);
-        merge(low, mid, high);
-    }
-}
+        p->mod = tmp;
+        p->array = array;
+        p->left = new_left;
+        p->right = new_right;
 
-int main() {
-    for (int i = 0; i < MAX; i++)
-        ARR[i] = rand() % 100;
+        pthread_mutex_init(&g_mutex, NULL);
 
-    clock_t t1, t2;
+        pthread_create(&threads[i], NULL, split, (void*)p);
 
-    t1 = clock();
-    pthread_t threads[THREAD_MAX];
-
-    for (int i = 0; i < THREAD_MAX; i++)
-        pthread_create(&threads[i], NULL, merge_sort, (void*)NULL);
-
-    for (int i = 0; i < 4; i++)
         pthread_join(threads[i], NULL);
 
-    merge(0, (MAX / 2 - 1) / 2, MAX / 2 - 1);
-    merge(MAX / 2, MAX / 2 + (MAX - 1 - MAX / 2) / 2, MAX - 1);
-    merge(0, (MAX - 1) / 2, MAX - 1);
+        pthread_mutex_destroy(&g_mutex);
+    }
 
-    t2 = clock();
+    u_long j;
+    u_long left;
+    u_long right;
+    for (u_long i = g_num_threads / 2; i > 0; i = i >> 1) { //divide by 2
+        for (j = 0; j < i; ++j) {
+            left = j * g_size_arr / i;
+            right = (j + 1) * g_size_arr / i;
 
-    cout << "Sorted array: ";
-    for (int i = 0; i < MAX; i++)
-        cout << ARR[i] << " ";
+            merge(array, left, (left + right) / 2, right, tmp);
+        }
+    }
+}
 
-    cout << "\nTime taken: " << (t2 - t1) / (double)CLOCKS_PER_SEC << endl;
+
+int main(int argc, char *argv[]) {
+    g_num_threads = atoi(argv[1]);
+
+    cout << "\n\tcount elements:\t";
+    // cin >> g_size_arr;
+    g_size_arr = 1000000000;
+    string array[g_size_arr];
+
+    for (u_long i = 0; i < g_size_arr; ++i) {
+        // cin >> array[i];
+        array[i] = to_string(rand() % 100000);
+    }
+
+    // <<<< time benchmarking
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+    double time_begin = ((double)tv.tv_sec) * 1000 + ((double)tv.tv_usec) / 1000;
+    // >>>> start
+
+    u_long power = 0;
+    while (g_num_threads > 0) {
+        g_num_threads = g_num_threads >> 1;  // div 2
+        ++power;
+    }
+
+    --power;
+    if (!power)
+        power = 1;
+
+    g_num_threads = (u_long)pow(2.0, (double)(power));
+
+
+    merge_sort(array);
+
+    cout << "\n Sorted array:\t";
+    for (u_long i = 0; i < g_size_arr; ++i)
+        cout << array[i] << " ";
+
+    cout << "\n";
+
+    // <<<< end
+    gettimeofday(&tv, NULL);
+    double time_end = ((double)tv.tv_sec) * 1000 + ((double)tv.tv_usec) / 1000 ;
+    double total_time_ms = time_end - time_begin;
+    cout << "\n\tTOTAL TIME:\t" << total_time_ms << " ms\n";
 
     return 0;
 }
