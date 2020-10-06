@@ -1,174 +1,167 @@
-#include <iostream>
 #include <pthread.h>
-#include <string>
-#include <cmath>
 #include <sys/time.h>
+#include <fstream>
+#include <string>
+#include <stdlib.h>
 
-using namespace std;
-
-
-u_long g_size_arr;
-u_long g_num_threads;
-pthread_mutex_t g_mutex;
+#define g_size_arr 1000
+long int arr[g_size_arr];
 
 struct params {
-    string* array;
-    u_long left;
-    u_long right;
-    string* mod;
+    long int id_th;
+    long int num_th;
 };
 
-u_long char_to_int(char c) {
-    if (c >= '0' && c <= '9') {
-        c -= '0';
-    } else if (c >= 'p' && c <= 'z') {
-        c -= 'W';
-    } else if (c >= 'A' && c <= 'Z') {
-        c = tolower(c);
-        c -= 'W';
-    }
-    return c;
-}
-
-bool a_lower_or_eq_b(string a, string b) {
-    u_long vec_a = 0;
-    u_long vec_b = 0;
-    u_long k = 1;
-    u_long i;
-    for(i = a.size(); i > 0; --i) {
-        vec_a += char_to_int(a[i]) * k;
-        k *= 10;
-    }
-    k = 1;
-    for(i = b.size(); i > 0; --i) {
-        vec_b += char_to_int(b[i]) * k;
-        k *= 10;
-    }
-    if (vec_a <= vec_b) {
-        return  true;
-    }
-    return false;
-}
-
-void merge(string *array, u_long left, u_long middle, u_long right, string *modif) {
-    u_long l = left;
-    u_long r = middle;
-    for (u_long i = left; i < right; ++i)
-        if (l < middle && (r >= right || a_lower_or_eq_b(array[l], array[r])))
-            modif[i] = array[l++];
-        else
-            modif[i] = array[r++];
-    for (u_long i = left; i < right; ++i)
-        array[i] = modif[i];
-}
-
-void* split(void* param) {
-    struct params* temp_args = new params;
-    temp_args = (params*)param;
-
-    if (temp_args->right - temp_args->left < 2)
-        return NULL;
-
-    u_long tmp_right = temp_args->right;
-    u_long tmp_left = temp_args->left;
-
-    temp_args->right = (tmp_left + tmp_right) / 2;
-    split((void*)temp_args);
-
-    temp_args->right = tmp_right;
-    temp_args->left = (tmp_left + tmp_right) / 2;
-    split((void*)temp_args);
-
-    temp_args->left = tmp_left;
-    merge(temp_args->array, temp_args->left, (temp_args->left + temp_args->right) / 2, temp_args->right, temp_args->mod);
-    return 0;
-}
-
-void merge_sort(string *array) {
-    struct params* p = new params;
-
-    string tmp[g_size_arr];
-    pthread_t threads[g_num_threads];
-
-    u_long new_left;
-    u_long new_right;
-    for (u_long i = 0; i < g_num_threads; ++i) {
-        new_left = i * g_size_arr / g_num_threads;
-        new_right = (i + 1) * g_size_arr / g_num_threads;
-
-        p->mod = tmp;
-        p->array = array;
-        p->left = new_left;
-        p->right = new_right;
-
-        pthread_mutex_init(&g_mutex, NULL);
-
-        pthread_create(&threads[i], NULL, split, (void*)p);
-
-        pthread_join(threads[i], NULL);
-
-        pthread_mutex_destroy(&g_mutex);
-    }
-
-    u_long j;
-    u_long left;
-    u_long right;
-    for (u_long i = g_num_threads / 2; i > 0; i = i >> 1) { //divide by 2
-        for (j = 0; j < i; ++j) {
-            left = j * g_size_arr / i;
-            right = (j + 1) * g_size_arr / i;
-
-            merge(array, left, (left + right) / 2, right, tmp);
-        }
-    }
-}
-
+void merge_sort(long int arr[], long int left, long int right);
+void merge(long int arr[], long int left, long int middle, long int right);
+void *thread_merge_sort(void* arg);
+void merge_sections(long int arr[], long int num_thread, long int size_sub_arr, long int aggregation);
+void test_order(long int arr[]);
 
 int main(int argc, char *argv[]) {
-    g_num_threads = atoi(argv[1]);
+    long int g_num_threads = atoi(argv[1]);
 
-    cout << "\n\tcount elements:\t";
+    long int size_sub_arr = g_size_arr / g_num_threads;
+    struct timeval start, end;
+    double time_spent;
+
+    std::ifstream in("gen_data.txt");
+    // std::cout << "\n\tcount elements:\t";
     // cin >> g_size_arr;
-    g_size_arr = 1000000000;
-    string array[g_size_arr];
 
+    std::string tmp;
     for (u_long i = 0; i < g_size_arr; ++i) {
-        // cin >> array[i];
-        array[i] = to_string(rand() % 100000);
+        // arr[i] = std::to_string(rand() % 100000);
+        getline(in, tmp);
+        arr[i] = stoi(tmp);
+    }
+    in.close();
+
+    pthread_t threads[g_num_threads];
+    gettimeofday(&start, NULL);
+
+    for (long i = 0; i < g_num_threads; ++i) {
+        struct params* p = new params;
+        p->id_th = i;
+        p->num_th = g_num_threads;
+        int err = pthread_create(&threads[i], NULL, thread_merge_sort, (void *) p);
+        if (err){
+            printf("ERROR return code from pthread_create() is %d\n", err);
+            exit(-1);
+        }
     }
 
-    // <<<< time benchmarking
-    struct timeval  tv;
-    gettimeofday(&tv, NULL);
-    double time_begin = ((double)tv.tv_sec) * 1000 + ((double)tv.tv_usec) / 1000;
-    // >>>> start
-
-    u_long power = 0;
-    while (g_num_threads > 0) {
-        g_num_threads = g_num_threads >> 1;  // div 2
-        ++power;
+    for(long i = 0; i < g_num_threads; ++i) {
+        pthread_join(threads[i], NULL);
     }
 
-    --power;
-    if (!power)
-        power = 1;
+    merge_sections(arr, g_num_threads, size_sub_arr, 1);
 
-    g_num_threads = (u_long)pow(2.0, (double)(power));
+    gettimeofday(&end, NULL);
+    time_spent = ((double) ((double) (end.tv_usec - start.tv_usec) / 1000000 + (double) (end.tv_sec - start.tv_sec)));
+    printf("Timing: %f s\n", time_spent);
 
-
-    merge_sort(array);
-
-    cout << "\n Sorted array:\t";
-    for (u_long i = 0; i < g_size_arr; ++i)
-        cout << array[i] << " ";
-
-    cout << "\n";
-
-    // <<<< end
-    gettimeofday(&tv, NULL);
-    double time_end = ((double)tv.tv_sec) * 1000 + ((double)tv.tv_usec) / 1000 ;
-    double total_time_ms = time_end - time_begin;
-    cout << "\n\tTOTAL TIME:\t" << total_time_ms << " ms\n";
+    // test
+    test_order(arr);
 
     return 0;
+}
+
+void merge(long int arr[], long int left, long int middle, long int right) {
+    long int i = 0;
+    long int j = 0;
+    long int k = 0;
+    long int left_length = middle - left + 1;
+    long int right_length = right - middle;
+    long int left_array[left_length];
+    long int right_array[right_length];
+
+    for (long int i = 0; i < left_length; ++i)
+        left_array[i] = arr[left + i];
+
+    for (long int j = 0; j < right_length; ++j)
+        right_array[j] = arr[middle + 1 + j];
+
+    i = 0;
+    j = 0;
+
+    while (i < left_length && j < right_length) {
+        if (left_array[i] <= right_array[j]) {
+            arr[left + k] = left_array[i];
+            ++i;
+        } else {
+            arr[left + k] = right_array[j];
+            ++j;
+        }
+        ++k;
+    }
+
+    while (i < left_length) {
+        arr[left + k] = left_array[i];
+        ++k;
+        ++i;
+    }
+    while (j < right_length) {
+        arr[left + k] = right_array[j];
+        ++k;
+        ++j;
+    }
+}
+
+void merge_sections(long int arr[], long int num_thread, long int size_sub_arr, long int aggregation) {
+    for(long int i = 0; i < num_thread; i = i + 2) {
+        long int left = i * (size_sub_arr * aggregation);
+        long int right = ((i + 2) * size_sub_arr * aggregation) - 1;
+        long int middle = left + (size_sub_arr * aggregation) - 1;
+        if (right >= g_size_arr) {
+            right = g_size_arr - 1;
+        }
+        merge(arr, left, middle, right);
+    }
+    if (num_thread / 2 > 0) {
+        merge_sections(arr, num_thread / 2, size_sub_arr, aggregation * 2);
+    }
+}
+
+void merge_sort(long int arr[], long int left, long int right) {
+    if (left < right) {
+        long int middle = left + (right - left) / 2;
+        merge_sort(arr, left, middle);
+        merge_sort(arr, middle + 1, right);
+        merge(arr, left, middle, right);
+    }
+}
+
+void *thread_merge_sort(void* arg) {
+    struct params * p = (struct params *)arg;
+    long int thread_id = p->id_th;
+    long int num_threads = p->num_th;
+    long int left = thread_id * (g_size_arr / num_threads);
+    long int right = (thread_id + 1) * (g_size_arr / num_threads) - 1;
+    if (thread_id == num_threads - 1) {
+        right += (g_size_arr % num_threads);
+    }
+    long int middle = left + (right - left) / 2;
+    if (left < right) {
+        merge_sort(arr, left, right);
+        merge_sort(arr, left + 1, right);
+        merge(arr, left, middle, right);
+    }
+    pthread_exit(nullptr);
+}
+
+void test_order(long int arr[]) {
+    long int max = arr[0];
+    for (long int i = 1; i < g_size_arr; ++i) {
+        if (arr[i] >= max) {
+            max = arr[i];
+        } else {
+            printf("Error Index %ld: prev %ld > current %ld\n", i, arr[i-1], arr[i]);
+            return;
+        }
+    }
+    for (long int i = 1; i < g_size_arr; ++i) {
+        printf("%ld\n", arr[i]);
+    }
+    printf("Array is in sorted order\n");
 }
