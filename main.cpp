@@ -34,7 +34,8 @@ int main(int argc, char *argv[]) {
     std::ifstream in("gen_data.txt");
 
     std::string tmp;
-    for (u_long i = 0; i < *g_size_arr; ++i) {
+    long int i;
+    for (i = 0; i < *g_size_arr; ++i) {
         // arr[i] = std::to_string(rand() % 100000);
         getline(in, tmp);
         arr[i] = stoi(tmp);
@@ -44,7 +45,7 @@ int main(int argc, char *argv[]) {
     pthread_t threads[g_num_threads];
     gettimeofday(&start, NULL);
 
-    for (long i = 0; i < g_num_threads; ++i) {
+    for (i = 0; i < g_num_threads; ++i) {
         struct params* p = new params;
         p->id_th = i;
         p->arr = arr;
@@ -56,7 +57,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    for(long i = 0; i < g_num_threads; ++i) {
+    for(i = 0; i < g_num_threads; ++i) {
         pthread_join(threads[i], NULL);
     }
 
@@ -75,18 +76,17 @@ int main(int argc, char *argv[]) {
 }
 
 void merge(long int arr[], long int left, long int middle, long int right) {
-    long int i = 0;
-    long int j = 0;
     long int k = 0;
     long int left_length = middle - left + 1;
     long int right_length = right - middle;
     long int left_array[left_length];
     long int right_array[right_length];
-
-    for (long int i = 0; i < left_length; ++i)
+    long int i;
+    long int j;
+    for (i = 0; i < left_length; ++i)
         left_array[i] = arr[left + i];
 
-    for (long int j = 0; j < right_length; ++j)
+    for (j = 0; j < right_length; ++j)
         right_array[j] = arr[middle + 1 + j];
 
     i = 0;
@@ -116,10 +116,13 @@ void merge(long int arr[], long int left, long int middle, long int right) {
 }
 
 void merge_sections(long int arr[], long int num_thread, long int size_sub_arr, long int aggregation) {
+    long int left;
+    long int right;
+    long int middle;
     for(long int i = 0; i < num_thread; i = i + 2) {
-        long int left = i * (size_sub_arr * aggregation);
-        long int right = ((i + 2) * size_sub_arr * aggregation) - 1;
-        long int middle = left + (size_sub_arr * aggregation) - 1;
+        left = i * (size_sub_arr * aggregation);
+        right = ((i + 2) * size_sub_arr * aggregation) - 1;
+        middle = left + (size_sub_arr * aggregation) - 1;
         if (right >= *g_size_arr) {
             right = *g_size_arr - 1;
         }
@@ -131,8 +134,9 @@ void merge_sections(long int arr[], long int num_thread, long int size_sub_arr, 
 }
 
 void merge_sort(long int arr[], long int left, long int right) {
+    long int middle;
     if (left < right) {
-        long int middle = left + (right - left) / 2;
+        middle = left + (right - left) / 2;
         merge_sort(arr, left, middle);
         merge_sort(arr, middle + 1, right);
         merge(arr, left, middle, right);
@@ -160,7 +164,8 @@ void *thread_merge_sort(void* arg) {
 
 void test_order(long int arr[]) {
     long int max = arr[0];
-    for (long int i = 1; i < *g_size_arr; ++i) {
+    long int i;
+    for (i = 1; i < *g_size_arr; ++i) {
         if (arr[i] >= max) {
             max = arr[i];
         } else {
@@ -168,7 +173,7 @@ void test_order(long int arr[]) {
             return;
         }
     }
-    for (long int i = 1; i < *g_size_arr; ++i) {
+    for (i = 1; i < *g_size_arr; ++i) {
         printf("%ld\n", arr[i]);
     }
     printf("\tArray is in sorted order\n");
