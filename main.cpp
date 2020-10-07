@@ -63,22 +63,21 @@ int main(int argc, char *argv[]) {
     printf("\tTime for %ld proccessing: %f s\n", *g_num_threads, time_spent);
 
 
+    test_order(arr, "multiproccessing");
+    // my gun barrel overheated 5s
     std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
     // single proc
     gettimeofday(&start, NULL);
-    merge_sections(arr_single_proc, 1, *g_size_arr, 1);
+    merge_sort(arr_single_proc, 0, *g_size_arr);
     gettimeofday(&end, NULL);
     time_single_spent = ((double) ((double) (end.tv_usec - start.tv_usec) / 1000000 + (double) (end.tv_sec - start.tv_sec)));
     printf("\tTime for single proc: %f s\n", time_single_spent);
 
-
-    printf("\tAcceleration S(n)=T(1)/T(n): %f", time_single_spent / time_spent);
-
-    // test
-    test_order(arr, "muliiproccessing");
     test_order(arr_single_proc, "singleproccessing");
 
+    printf("\tAcceleration S(n)=T(1)/T(n): %f", time_single_spent / time_spent);
+    printf("\n");
     delete g_size_arr;
     delete g_num_threads;
     delete[] arr;
@@ -133,14 +132,14 @@ void merge_sections(long int* arr, long int num_thread, long int size_sub_arr, l
     long int middle;
     for(long int i = 0; i < num_thread; i = i + 2) {
         left = i * (size_sub_arr * aggregation);
-        right = ((i + 2) * size_sub_arr * aggregation) - 1;
+        right = left + ((i + 2) * size_sub_arr * aggregation) - 1;
         middle = left + (size_sub_arr * aggregation) - 1;
         if (right >= *g_size_arr) {
             right = *g_size_arr - 1;
         }
         merge(arr, left, middle, right);
     }
-    if (num_thread / 2 > 0) {
+    if (num_thread / 2 >= 1) {
         merge_sections(arr, num_thread / 2, size_sub_arr, aggregation * 2);
     }
 }
