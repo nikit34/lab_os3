@@ -24,7 +24,8 @@ int main(int argc, char *argv[]) {
 
     g_size_arr = new long int;
     printf("\n\tCount elements:\t");
-    scanf("%ld", g_size_arr);
+    // scanf("%ld", g_size_arr);
+    *g_size_arr = 1000;
     arr = new long int[*g_size_arr];
     arr_single_proc = new long int[*g_size_arr];
 
@@ -32,17 +33,16 @@ int main(int argc, char *argv[]) {
     struct timeval start, end;
     double time_spent, time_single_spent;
 
-    std::ifstream in("gen_data.txt");
-
-    std::string tmp;
+    // std::ifstream in("gen_data.txt");
+    // std::string tmp;
     long int i;
     for (i = 0; i < *g_size_arr; ++i) {
-        // arr[i] = std::to_string(rand() % 100000);
-        getline(in, tmp);
-        arr[i] = stoi(tmp);
+        arr[i] = rand() % 1000000;
+        // getline(in, tmp);
+        // arr[i] = stoi(tmp);
         arr_single_proc[i] = arr[i];
     }
-    in.close();
+    // in.close();
 
     // more proc
     pthread_t threads[*g_num_threads];
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     merge_sections(arr, *g_num_threads, size_sub_arr, 1);
     gettimeofday(&end, NULL);
     time_spent = ((double) ((double) (end.tv_usec - start.tv_usec) / 1000000 + (double) (end.tv_sec - start.tv_sec)));
-    printf("\tTime for %ld proccessing: %f s\n", *g_num_threads, time_spent);
+    printf("\n\tTime for %ld proccessing: %f s\n", *g_num_threads, time_spent);
 
 
     test_order(arr, "multiproccessing");
@@ -185,7 +185,7 @@ void test_order(long int* arr, std::string msg) {
         }
     }
     if (noerror)
-        printf("\n\tArray is in sorted order\n");
+        printf("\tArray is in sorted order\n");
 
     // for (i = 1; i < *g_size_arr; ++i) {
     //     printf("%ld\n", arr[i]);
