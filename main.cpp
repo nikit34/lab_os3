@@ -76,7 +76,12 @@ int main(int argc, char *argv[]) {
 
     test_order(arr_single_proc, "singleproccessing");
 
-    printf("\tAcceleration S(n)=T(1)/T(n): %f", time_single_spent / time_spent);
+    // metrics
+    printf("\n\n\n\tResults\n");
+    printf("\tAcceleration S(n)=T(1)/T(n):         %f\n", time_single_spent / time_spent);
+    printf("\tEfficiency E(n)=S(n)/n=T(1)/(nT(n)): %f\n\n", time_single_spent / (time_spent * (*g_num_threads)));
+
+
     printf("\n");
     delete g_size_arr;
     delete g_num_threads;
