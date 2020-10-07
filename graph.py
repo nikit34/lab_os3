@@ -5,10 +5,12 @@ import matplotlib
 
 
 df = pd.read_excel('result_tests.xlsx', 'Лист1', index_col=None, na_values=['NA'])
-
 x = df['time'][1:]
 y1 = df['count elements'][1:]
 y2 = df['Unnamed: 2'][1:]
+
+y1 = [i*10000 for i in y1]
+y2 = [i*10000 for i in y2]
 
 y1_max = max(y1)
 y2_max = max(y2)
@@ -33,7 +35,7 @@ ax.grid()
 ax.set_title('Dependence of number threads\non execution time sorting array\nby merge method')
 plt.ylim(-100, y_max * 1.25 + 100)
 plt.xlabel("Counts")
-plt.ylabel("Times (s)")
+plt.ylabel("Times (ms)")
 plt.legend()
 
 plt.savefig('test2.png')
